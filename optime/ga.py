@@ -80,6 +80,8 @@ class Population():
         self._individuals = individuals # a list of Recipe objects
         self.original_size = len(individuals)
         self.goals_dict = goals_dict
+        if conditions is None:
+            conditions = []
         self.conditions = conditions
 
     @property
