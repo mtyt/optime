@@ -1,1 +1,1 @@
-from .ga import Population, child, test_var
+from .ga import Population, child
