@@ -71,3 +71,13 @@ class TestPopulation(unittest.TestCase):
     def test(self):
         pop = TestPopulation.pop
         self.assertEquals(pop.goals_names, ['some_performance'])
+        # check if the DataFrame is constructed correctly:
+        for col in ['Individual', 'some_performance', 'some_condition']:
+            check = col in pop.df.columns
+            self.assertTrue(check)
+        self.assertEqual(len(TestPopulation.inds), len(pop.df))
+        
+        # now just run some of the methods without error:
+        _ = pop.summary()
+        pop.make_offspring()
+        pop.trim()
