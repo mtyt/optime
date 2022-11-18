@@ -21,3 +21,6 @@ dependencies = [
 'pandas>=1.5.1',
 'matplotlib>=3.6.2'
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/mtyt/optime"
