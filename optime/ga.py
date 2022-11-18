@@ -12,6 +12,7 @@ def sort_pareto(df, crit_cols):
     """Find the Pareto front and assign all the items the order 0,
     then remove these items from the df and find the next PF, whih is
     assigned order 1, etc...
+    NOT YET IMPLEMENTED
     """
 
 def child(parent_1, parent_2):
