@@ -231,7 +231,8 @@ class Population():
         '''
         df = self.df
         front = self.pareto()[self.goals_dict.keys()]
-        if len(front.columns) == 2:
+        num_vars = len(front.columns)
+        if num_vars == 2:
             fig, ax = plt.subplots()
             x = front.columns[0]
             y = front.columns[1]
@@ -239,10 +240,15 @@ class Population():
             front.plot.scatter(x=x,y=y,color='r', ax=ax, label='Pareto')
             ax.grid()
             ax.legend()
-        elif len(front.columns) == 3:
+        elif num_vars > 2:
+            if num_vars > 3:
+                # force mode to 2d
+                mode = '2d'
+                
             if mode == '2d':
-                fig, ax = plt.subplots(nrows=3, ncols=1)
-                for x_i, y_i in [(0,1), (1,2), (2,0)]:
+                fig, ax = plt.subplots(nrows=num_vars, ncols=1)
+                for x_i, y_i in [(i, np.mod(i+1, num_vars))
+                                 for i in range(num_vars)]:
                     x = front.columns[x_i]
                     y = front.columns[y_i]
                     df.plot.scatter(x=x,y=y, ax=ax[x_i], label='All Data')
@@ -258,5 +264,8 @@ class Population():
                 ax = fig.add_subplot(projection='3d')
                 ax.scatter(df[x], df[y], df[z])
                 ax.scatter(front[x], front[y], front[z], color='red')
+        else:
+            raise ValueError('Need at least 2 variables to plot.')
+            
         plt.show()
         
