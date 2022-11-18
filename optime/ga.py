@@ -75,6 +75,9 @@ class Population():
         if individuals is None:
             individuals = 10
         if isinstance(individuals, int):
+            if ind_class is None:
+                raise ValueError('ind_class must be specified if individuals'
+                                 'is None or an int.')
             individuals = [ind_class() for i in
                            np.arange(individuals)]
         self._individuals = individuals # a list of Recipe objects

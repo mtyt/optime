@@ -8,9 +8,11 @@ rng = np.random.default_rng()
 
 class Individual():
     '''Dummy class for individuals in the GA.'''
-    def __init__(self, country, language, some_property=None):
+    def __init__(self, country=None, language=None, some_property=None):
         self.country = country
         self.language = language
+        if some_property is None:
+            some_property = [0,1,2]
         self.some_property = some_property
     
     @property
@@ -36,7 +38,8 @@ class TestChild(unittest.TestCase):
         i_2.dna = [0,0,0,0]
         
         # go through 2 cases: with and without parent_props:
-        for with_parent_props in [True, False]:
+        # Do False first because otherwise the parent_props exist.
+        for with_parent_props in [False, True]:
             if with_parent_props:
                 # Define that the attributes can just be copied from a parent:
                 Individual.parent_props = ['country', 'language']
@@ -70,7 +73,7 @@ class TestPopulation(unittest.TestCase):
     
     def test(self):
         pop = TestPopulation.pop
-        self.assertEquals(pop.goals_names, ['some_performance'])
+        self.assertEqual(pop.goals_names, ['some_performance'])
         # check if the DataFrame is constructed correctly:
         for col in ['Individual', 'some_performance', 'some_condition']:
             check = col in pop.df.columns
@@ -81,3 +84,12 @@ class TestPopulation(unittest.TestCase):
         _ = pop.summary()
         pop.make_offspring()
         pop.trim()
+        
+    def test_init(self):
+        def cause_err():
+            pop_err = Population() # should raise ValueError
+        self.assertRaises(ValueError, cause_err)
+        pop_0 = Population(ind_class=Individual) # should create pop with 10 individuals
+        self.assertEqual(len(pop_0.individuals), 10)
+        pop_1 = Population(2, ind_class=Individual) # should create pop with 2 individuals
+        self.assertEqual(len(pop_1.individuals), 2)
