@@ -1,4 +1,4 @@
-'''Optimization'''
+"""Optimization"""
 from functools import cached_property
 from inspect import signature
 import pandas as pd
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 rng = np.random.default_rng()
 
+
 def sort_pareto(df, crit_cols):
     """Find the Pareto front and assign all the items the order 0,
     then remove these items from the df and find the next PF, whih is
@@ -15,23 +16,23 @@ def sort_pareto(df, crit_cols):
     NOT YET IMPLEMENTED
     """
 
+
 def child(parent_1, parent_2):
-    '''Produce a child of two parents, based on DNA exchange'''
+    """Produce a child of two parents, based on DNA exchange"""
     if not isinstance(parent_1, type(parent_2)):
-        raise TypeError('To inputs must be the same class!')
+        raise TypeError("To inputs must be the same class!")
     child_cls = parent_1.__class__
     try:
         _ = len(parent_1.dna)
     except AttributeError as err:
-        raise AttributeError('Did you define the dna property on the'\
-            'class?') from err
+        raise AttributeError("Did you define the dna property on the" "class?") from err
 
     # do some random gene swapping:
     both = np.vstack((parent_1.dna, parent_2.dna))
-    both_perm = rng.permuted(both,axis=0)
+    both_perm = rng.permuted(both, axis=0)
     child_vec = both_perm[0]
 
-    child_par = {} # a dict that will contain the parameters
+    child_par = {}  # a dict that will contain the parameters
 
     # Two alternatives to get the __init__ arguments from the parents
     # 1) if a parent_1.parent_props is defined, use that list to
@@ -49,39 +50,42 @@ def child(parent_1, parent_2):
         # it's not required.
         sig = signature(child_cls.__init__)
         for par in sig.parameters.keys():
-            if not par == 'self':
+            if not par == "self":
                 parent_1_par = getattr(parent_1, par)
                 parent_2_par = getattr(parent_2, par)
-                test = (parent_1_par == parent_2_par)
+                test = parent_1_par == parent_2_par
                 try:
-                    test =  test.all()
+                    test = test.all()
                 except AttributeError:
                     pass
-                if test: # if they're different, they could be the DNA
+                if test:  # if they're different, they could be the DNA
                     child_par[par] = parent_1_par
 
     kid = child_cls(**child_par)
     kid.dna = child_vec
     return kid
 
-class Population():
-    '''goals_dict is a dictionnary with as keys the column names that
+
+class Population:
+    """goals_dict is a dictionnary with as keys the column names that
     need to be optimized and as values 'min' or 'max'.
     conditions is a list of strings that represent names of columns
     for which the value must be True, otherwise the individual is
     removed from the pareto-front immediately.
-    '''
-    def __init__(self, individuals=None, goals_dict=None,
-                conditions=None, ind_class=None):
+    """
+
+    def __init__(
+        self, individuals=None, goals_dict=None, conditions=None, ind_class=None
+    ):
         if individuals is None:
             individuals = 10
         if isinstance(individuals, int):
             if ind_class is None:
-                raise ValueError('ind_class must be specified if individuals'
-                                 'is None or an int.')
-            individuals = [ind_class() for i in
-                           np.arange(individuals)]
-        self._individuals = individuals # a list of Recipe objects
+                raise ValueError(
+                    "ind_class must be specified if individuals" "is None or an int."
+                )
+            individuals = [ind_class() for i in np.arange(individuals)]
+        self._individuals = individuals  # a list of Recipe objects
         self.original_size = len(individuals)
         self.goals_dict = goals_dict
         if conditions is None:
@@ -90,53 +94,52 @@ class Population():
 
     @property
     def goals_names(self):
-        '''Returns the keys of the goals_dict.'''
+        """Returns the keys of the goals_dict."""
         return list(self.goals_dict.keys())
 
     @property
     def individuals(self):
-        '''Returns the _individuals.'''
+        """Returns the _individuals."""
         return self._individuals
 
     @individuals.setter
     def individuals(self, x):
         self._individuals = x
-        list_of_dependent_properties = ['df',
-                                        'df_flat'
-                                        ]
+        list_of_dependent_properties = ["df", "df_flat"]
         for prop in list_of_dependent_properties:
-            if prop in  self.__dict__:
-                delattr(self,prop)
+            if prop in self.__dict__:
+                delattr(self, prop)
 
     @cached_property
     def df(self):
         """A DataFrame with each row representing a Recipe, with
         columns of kg of each food, the impact and enough_score.
         """
-        df_pop = pd.DataFrame(columns = ['Individual']
-                              + self.goals_names)
+        df_pop = pd.DataFrame(columns=["Individual"] + self.goals_names)
         for i, ind in enumerate(self.individuals):
-            df_pop.loc[i, 'Individual'] = ind
-            df_pop.loc[i, self.goals_names] = [getattr(ind, name)
-                                               for name in self.goals_names]
-            df_pop.loc[i, self.conditions] = [getattr(ind, name)
-                                              for name in self.conditions]
+            df_pop.loc[i, "Individual"] = ind
+            df_pop.loc[i, self.goals_names] = [
+                getattr(ind, name) for name in self.goals_names
+            ]
+            df_pop.loc[i, self.conditions] = [
+                getattr(ind, name) for name in self.conditions
+            ]
         return df_pop
 
     def summary(self):
-        '''Returns a dict which is a summary of the performance of the
-        Population as a mean of each parameter.'''
+        """Returns a dict which is a summary of the performance of the
+        Population as a mean of each parameter."""
         summary_dict = dict()
         for goal in self.goals_dict:
             summary_dict[goal] = np.mean(self.df[goal])
         for cond in self.conditions:
-            summary_dict[cond] = sum(self.df[cond])/len(self.df)
+            summary_dict[cond] = sum(self.df[cond]) / len(self.df)
         return summary_dict
 
     def make_offspring(self, n=None):
-        '''Make n children fron 2n random parents.'''
+        """Make n children fron 2n random parents."""
         if n is None:
-            n=self.original_size
+            n = self.original_size
         # Make 2 random vectors of length n with values 0 to
         # len(self.individuals) to determine who mates with whom:
         parent_1_vec = rng.choice(self.individuals, n)
@@ -147,13 +150,12 @@ class Population():
         self.individuals = rec
 
     def trim(self, n=None):
-        '''Trim the population down to n individuals, based on Pareto front
-        '''
+        """Trim the population down to n individuals, based on Pareto front"""
         if n is None:
-            n=self.original_size
+            n = self.original_size
         new_n = 0
         temp_pop = self.df.copy()
-        new_pop = pd.DataFrame(columns = self.df.columns)
+        new_pop = pd.DataFrame(columns=self.df.columns)
         while new_n < n:
             front = self.pareto(df=temp_pop)
             # the front is added to the new population:
@@ -163,8 +165,8 @@ class Population():
             # remove the front from the temp_pop and continue with that:
             temp_pop = temp_pop.drop(front.index)
 
-        self.individuals = list(new_pop.iloc[0:n]['Individual'].values)
-        #print('Indices on df have been reset')
+        self.individuals = list(new_pop.iloc[0:n]["Individual"].values)
+        # print('Indices on df have been reset')
 
     def pareto(self, df=None):
         """df is the dataframe on which to select the pareto front.
@@ -199,11 +201,11 @@ class Population():
 
         crit_cols = self.goals_dict
         front = pd.DataFrame(columns=df.columns)
-        worse_dict = {} # dict containing a sorted df per criterium
+        worse_dict = {}  # dict containing a sorted df per criterium
         for col in crit_cols:
-            if crit_cols[col] == 'min':
+            if crit_cols[col] == "min":
                 worse_dict[col] = df.sort_values(col, ascending=True)
-            elif crit_cols[col] == 'max':
+            elif crit_cols[col] == "max":
                 worse_dict[col] = df.sort_values(col, ascending=False)
             else:
                 raise ValueError("Values in crit_cols must be 'min' or 'max'")
@@ -221,14 +223,14 @@ class Population():
                 union = np.union1d(union, worse_index)
             nondom = df.index.equals(pd.Index(union))
             if nondom:
-                front = pd.concat([front,df.loc[[item],:]], axis=0)
+                front = pd.concat([front, df.loc[[item], :]], axis=0)
         return front
 
-    def plot_pareto(self, mode='2d'):
-        '''Plot the pareto front on top of the complete population. In case
+    def plot_pareto(self, mode="2d"):
+        """Plot the pareto front on top of the complete population. In case
         of 2 variables, 2D plot is the only valid option. For more variables,
         a 3D plot can be made, or multiple 2D plots.
-        '''
+        """
         df = self.df
         front = self.pareto()[self.goals_dict.keys()]
         num_vars = len(front.columns)
@@ -236,36 +238,61 @@ class Population():
             fig, ax = plt.subplots()
             x = front.columns[0]
             y = front.columns[1]
-            df.plot.scatter(x=x,y=y, ax=ax, label='All Data')
-            front.plot.scatter(x=x,y=y,color='r', ax=ax, label='Pareto')
+            df.plot.scatter(x=x, y=y, ax=ax, label="All Data")
+            front.plot.scatter(x=x, y=y, color="r", ax=ax, label="Pareto")
             ax.grid()
             ax.legend()
         elif num_vars > 2:
             if num_vars > 3:
                 # force mode to 2d
-                mode = '2d'
-                
-            if mode == '2d':
+                mode = "2d"
+
+            if mode == "2d":
                 fig, ax = plt.subplots(nrows=num_vars, ncols=1)
-                for x_i, y_i in [(i, np.mod(i+1, num_vars))
-                                 for i in range(num_vars)]:
+                for x_i, y_i in [(i, np.mod(i + 1, num_vars)) for i in range(num_vars)]:
                     x = front.columns[x_i]
                     y = front.columns[y_i]
-                    df.plot.scatter(x=x,y=y, ax=ax[x_i], label='All Data')
-                    front.plot.scatter(x=x,y=y,color='r', ax=ax[x_i],
-                                       label='Pareto')
+                    df.plot.scatter(x=x, y=y, ax=ax[x_i], label="All Data")
+                    front.plot.scatter(x=x, y=y, color="r", ax=ax[x_i], label="Pareto")
                     ax[x_i].grid()
                     ax[x_i].legend()
-            elif mode == '3d':
+            elif mode == "3d":
                 x = front.columns[0]
                 y = front.columns[1]
                 z = front.columns[2]
                 fig = plt.figure()
-                ax = fig.add_subplot(projection='3d')
+                ax = fig.add_subplot(projection="3d")
                 ax.scatter(df[x], df[y], df[z])
-                ax.scatter(front[x], front[y], front[z], color='red')
+                ax.scatter(front[x], front[y], front[z], color="red")
         else:
-            raise ValueError('Need at least 2 variables to plot.')
-            
+            raise ValueError("Need at least 2 variables to plot.")
+
         plt.show()
-        
+
+    def run(self, n_gen=10, verbose=False):
+        """Run the optimization for n_gen generations."""
+        n_gen = 10
+        summaries = []
+        for gen in np.arange(n_gen):
+            if verbose:
+                print(f"Doing generation {gen}.")
+            self.make_offspring()
+            self.trim()
+            summaries.append(self.summary())
+        self.summaries = summaries
+
+    def plot_progress(self, fig=None, ax=None):
+        """Plot the progress of the generations."""
+        if fig is None and ax is None:
+            fig, ax = plt.subplots(ncols=1, nrows=len(self.summary()))
+        else:
+            if not len(ax) == len(self.summary()):
+                raise ValueError(
+                    f"ax has length {len(ax)} but summary has length {len(self.summary())}"
+                )
+
+        fig.set_size_inches(8, 8)
+        for i, summ in enumerate(self.summary()):
+            y = [gen[summ] for gen in self.summaries]
+            ax[i].plot(y)
+            ax[i].set_ylabel(summ)
