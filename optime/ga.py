@@ -91,6 +91,7 @@ class Population:
         if conditions is None:
             conditions = []
         self.conditions = conditions
+        self.summaries = None
 
     @property
     def goals_names(self):
@@ -271,7 +272,6 @@ class Population:
 
     def run(self, n_gen=10, verbose=False):
         """Run the optimization for n_gen generations."""
-        n_gen = 10
         summaries = []
         for gen in np.arange(n_gen):
             if verbose:
@@ -296,3 +296,4 @@ class Population:
             y = [gen[summ] for gen in self.summaries]
             ax[i].plot(y)
             ax[i].set_ylabel(summ)
+

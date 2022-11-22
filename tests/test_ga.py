@@ -1,7 +1,7 @@
 '''Unit tests for the ga.py module'''
 import unittest
 import numpy as np
-from optime import child, Population
+from optime.ga import child, Population
 
 rng = np.random.default_rng()
 
