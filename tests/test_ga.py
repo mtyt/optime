@@ -53,11 +53,15 @@ class TestChild(unittest.TestCase):
                 
 class TestPopulation(unittest.TestCase):
     '''Unit tests for Population class.'''
-    
-    # prepare 10 individuals:
-    inds = [Individual('Belgium', 'Dutch',
-                       some_property = rng.integers(0,2000, 7))
-            for _ in range(10)]
+    dna_length = 3
+    some_prop = rng.integers(0, 2000, dna_length)
+    some_prop
+    num_individuals = 10
+    # prepare num_individuals individuals:
+    inds = []
+    for _ in range(num_individuals):
+        inds.append(Individual('Belgium', 'Dutch',
+                       some_property = some_prop))
     
     # bind the 'dna' attribute to an existing attribute of the Individual class
     def get_dna(self):
@@ -83,7 +87,16 @@ class TestPopulation(unittest.TestCase):
         # now just run some of the methods without error:
         _ = pop.summary()
         pop.make_offspring()
-        pop.trim()
+        pop.trim(n=12)
+        self.assertEqual(len(pop.df), 12)
+        pop.mutate(prob = 1, values=[6]) # should turn all DNA values into 6
+        self.assertTrue(all([all([val == 6 for val in ind.dna]) for ind in pop.individuals]))
+        # now also the DNA values should return list of 6:
+        self.assertTrue(pop.possible_dna_values == [[6]]*TestPopulation.dna_length)
+        pop.mutate(prob = 0, values=[8000]) # should turn NO DNA values into 8:
+        self.assertTrue(all([all([val != 8000 for val in ind.dna]) for ind in pop.individuals]))
+        pop.mutate(prob = 1, values=[[8000, 166], [8000], [8000]]) # should turn All DNA values into 8000 or 166:
+        self.assertTrue(all([all([val == 8000 or val == 166 for val in ind.dna]) for ind in pop.individuals]))
         
     def test_init(self):
         def cause_err():

@@ -75,7 +75,8 @@ class Population:
     """
 
     def __init__(
-        self, individuals=None, goals_dict=None, conditions=None, ind_class=None
+        self, individuals=None, goals_dict=None, conditions=None, ind_class=None,
+        possible_dna_values=None
     ):
         if individuals is None:
             individuals = 10
@@ -92,7 +93,24 @@ class Population:
             conditions = []
         self.conditions = conditions
         self.summaries = None
+        if possible_dna_values is not None:
+            self.possible_dna_fixed = True
+            self.possible_dna_values = possible_dna_values
+        else:
+            self.possible_dna_fixed = False
 
+
+    @cached_property
+    def possible_dna_values(self):
+        '''If the possibel DNA values have not been specified at init, derive them
+        from all the values in the population.'''
+        if not self.possible_dna_fixed:
+            dna_length = len(self.individuals[0].dna)
+            dna_vals = []
+            for i in range(dna_length):
+                dna_vals.append(list(set([ind.dna[i] for ind in self.individuals])))
+            return dna_vals
+    
     @property
     def goals_names(self):
         """Returns the keys of the goals_dict."""
@@ -106,7 +124,7 @@ class Population:
     @individuals.setter
     def individuals(self, x):
         self._individuals = x
-        list_of_dependent_properties = ["df", "df_flat"]
+        list_of_dependent_properties = ["df", "df_flat", "possible_dna_values"]
         for prop in list_of_dependent_properties:
             if prop in self.__dict__:
                 delattr(self, prop)
@@ -149,6 +167,39 @@ class Population:
         for parent_1, parent_2 in zip(parent_1_vec, parent_2_vec):
             rec.append(child(parent_1, parent_2))
         self.individuals = rec
+        
+    def mutate(self, prob=0.01, values=None):
+        '''Mutate the DNA of the individuals of the population. Each gene has a 
+        probability 'prob' of mutating. If values is specified, it lists all possible
+        values for each gene if it's a list of lists. If it's just a list, it's assumed
+        that all values are valid for all genes. If it is None, we assume it's binary.
+        If the number of values is >2, it's the probability that ANOTHER value is
+        uniformly picked.
+        '''
+        if values is None:
+            values = [0, 1]
+        if isinstance(values, list):
+            if not all([isinstance(val, list) for val in values]):
+                # Either it's just a list of values:
+                if not all([isinstance(val, type(values[0])) for val in values]):
+                    raise ValueError("values is not a list of list nor a list of the same type")
+                else:
+                    flat_list = True
+            else:
+                flat_list = False
+        
+        for ind in self.individuals:
+            for index, original_val in enumerate(ind.dna):
+                if flat_list:
+                    gene_values = values.copy()
+                else:
+                    gene_values = values[index].copy()
+                if original_val in gene_values:
+                    gene_values.remove(original_val)
+                # now check the probability:
+                if (rng.random() <= prob) and gene_values:
+                    ind.dna[index] = rng.choice(gene_values)
+                    
 
     def trim(self, n=None):
         """Trim the population down to n individuals, based on Pareto front"""
@@ -278,6 +329,7 @@ class Population:
                 print(f"Doing generation {gen}.")
             self.make_offspring()
             self.trim()
+            self.mutate()
             summaries.append(self.summary())
         self.summaries = summaries
 
