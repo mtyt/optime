@@ -3,6 +3,7 @@ from functools import cached_property
 from inspect import signature
 import pandas as pd
 import numpy as np
+from typing import Optional
 import matplotlib.pyplot as plt
 
 
@@ -75,8 +76,12 @@ class Population:
     """
 
     def __init__(
-        self, individuals=None, goals_dict=None, conditions=None, ind_class=None,
-        possible_dna_values=None
+        self,
+        individuals=None,
+        goals_dict=None,
+        conditions=None,
+        ind_class=None,
+        possible_dna_values=None,
     ):
         if individuals is None:
             individuals = 10
@@ -99,18 +104,17 @@ class Population:
         else:
             self.possible_dna_fixed = False
 
-
     @cached_property
     def possible_dna_values(self):
-        '''If the possibel DNA values have not been specified at init, derive them
-        from all the values in the population.'''
+        """If the possibel DNA values have not been specified at init, derive them
+        from all the values in the population."""
         if not self.possible_dna_fixed:
             dna_length = len(self.individuals[0].dna)
             dna_vals = []
             for i in range(dna_length):
                 dna_vals.append(list(set([ind.dna[i] for ind in self.individuals])))
             return dna_vals
-    
+
     @property
     def goals_names(self):
         """Returns the keys of the goals_dict."""
@@ -155,10 +159,19 @@ class Population:
             summary_dict[cond] = sum(self.df[cond]) / len(self.df)
         return summary_dict
 
-    def make_offspring(self, n=None):
-        """Make n children fron 2n random parents."""
-        if n is None:
-            n = self.original_size
+    def make_offspring(self, mateprob: float = 1) -> None:
+        """Make n children fron 2n random parents.
+
+        Args:
+            mateprob: Probability for mating. 1 corresponds to 2 parent vectors of
+                length equal to population size.
+
+        """
+        if mateprob < 0 or mateprob > 1:
+            raise ValueError(
+                f"mateprob should be min 0 and max 1 (received {mateprob})."
+            )
+        n = int(self.original_size * mateprob)
         # Make 2 random vectors of length n with values 0 to
         # len(self.individuals) to determine who mates with whom:
         parent_1_vec = rng.choice(self.individuals, n)
@@ -167,27 +180,39 @@ class Population:
         for parent_1, parent_2 in zip(parent_1_vec, parent_2_vec):
             rec.append(child(parent_1, parent_2))
         self.individuals = rec
-        
-    def mutate(self, prob=0.01, values=None):
-        '''Mutate the DNA of the individuals of the population. Each gene has a 
+
+    def mutate(
+        self, mutprob: float = 0.01, values: Optional[list | list[list]] = None
+    ) -> None:
+        """Mutate the DNA of the individuals of the population. Each gene has a
         probability 'prob' of mutating. If values is specified, it lists all possible
         values for each gene if it's a list of lists. If it's just a list, it's assumed
         that all values are valid for all genes. If it is None, we assume it's binary.
         If the number of values is >2, it's the probability that ANOTHER value is
         uniformly picked.
-        '''
+
+        Args:
+            mutprob: Probability of mutating, should be <=1.
+            mutvalues: If necessary, can pass possible values for each element in the DNA
+        """
+
+        if mutprob < 0 or mutprob > 1:
+            raise ValueError(f"mutprob should be min 0 and max 1 (received {mutprob}).")
+
         if values is None:
             values = [0, 1]
         if isinstance(values, list):
             if not all([isinstance(val, list) for val in values]):
                 # Either it's just a list of values:
                 if not all([isinstance(val, type(values[0])) for val in values]):
-                    raise ValueError("values is not a list of list nor a list of the same type")
+                    raise ValueError(
+                        "values is not a list of list nor a list of the same type"
+                    )
                 else:
                     flat_list = True
             else:
                 flat_list = False
-        
+
         for ind in self.individuals:
             for index, original_val in enumerate(ind.dna):
                 if flat_list:
@@ -197,9 +222,8 @@ class Population:
                 if original_val in gene_values:
                     gene_values.remove(original_val)
                 # now check the probability:
-                if (rng.random() <= prob) and gene_values:
+                if (rng.random() <= mutprob) and gene_values:
                     ind.dna[index] = rng.choice(gene_values)
-                    
 
     def trim(self, n=None):
         """Trim the population down to n individuals, based on Pareto front"""
@@ -321,15 +345,32 @@ class Population:
 
         plt.show()
 
-    def run(self, n_gen=10, verbose=False):
-        """Run the optimization for n_gen generations."""
+    def run(
+        self,
+        n_gen: int = 10,
+        mateprob: float = 1.0,
+        mutprob: float = 0.01,
+        mutvalues=Optional[list | list[list]],
+        verbose: bool = False,
+    ) -> None:
+        """Run the optimization for n_gen generations.
+
+        Args:
+            n_gen: The number generation to run the GA for.
+            mateprob: Probability for mating. 1 corresponds to 2 parent vectors of
+                length equal to population size.
+            mutprob: Probability of mutating, should be <=1.
+            mutvalues: If necessary, can pass possible values for each element in the DNA
+            verbose: Turn on or off print statements.
+
+        """
         summaries = []
         for gen in np.arange(n_gen):
             if verbose:
                 print(f"Doing generation {gen}.")
-            self.make_offspring()
+            self.make_offspring(mateprob)
             self.trim()
-            self.mutate()
+            self.mutate(mutprob, mutvalues)
             summaries.append(self.summary())
         self.summaries = summaries
 
@@ -348,4 +389,3 @@ class Population:
             y = [gen[summ] for gen in self.summaries]
             ax[i].plot(y)
             ax[i].set_ylabel(summ)
-
