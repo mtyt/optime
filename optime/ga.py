@@ -350,7 +350,7 @@ class Population:
         n_gen: int = 10,
         mateprob: float = 1.0,
         mutprob: float = 0.01,
-        mutvalues=Optional[list | list[list]],
+        mutvalues: Optional[list | list[list]] = None,
         verbose: bool = False,
     ) -> None:
         """Run the optimization for n_gen generations.
