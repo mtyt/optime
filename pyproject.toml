@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "optime"
-version = "0.0.1"
 authors = [
   { name="Maarten Tytgat", email="maarten.tytgat@gmail.com" },
 ]
