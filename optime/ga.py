@@ -149,12 +149,32 @@ class Population:
             ]
         return df_pop
 
-    def summary(self):
+    def summary(self, measure: str = 'mean') -> dict:
         """Returns a dict which is a summary of the performance of the
-        Population as a mean of each parameter."""
+        Population as a mean of each parameter.
+        
+        Args:
+            measure: 'mean' or 'best'
+            
+        Returns:
+            dict with the mean or best for each parameter, plus which percentage of
+            conditions are met.
+        """
+        
         summary_dict = dict()
         for goal in self.goals_dict:
-            summary_dict[goal] = np.mean(self.df[goal])
+            if measure == 'mean':
+                summary_dict[goal] = np.mean(self.df[goal])
+            elif measure == 'best':
+                target = self.goals_dict[goal]
+                if target == 'min':
+                    summary_dict[goal] = np.min(self.df[goal])
+                elif target == 'max':
+                    summary_dict[goal] = np.max(self.df[goal])
+                else:
+                    ValueError(f'goals should be min or max but got {target}.')
+            else:
+                raise ValueError(f'measure should be mean or best but got {measure}.')
         for cond in self.conditions:
             summary_dict[cond] = sum(self.df[cond]) / len(self.df)
         return summary_dict
@@ -364,28 +384,39 @@ class Population:
             verbose: Turn on or off print statements.
 
         """
-        summaries = []
+        summaries = {'mean':[], 'best':[]}
         for gen in np.arange(n_gen):
             if verbose:
                 print(f"Doing generation {gen}.")
             self.make_offspring(mateprob)
             self.trim()
             self.mutate(mutprob, mutvalues)
-            summaries.append(self.summary())
+            summaries['mean'].append(self.summary(measure='mean'))
+            summaries['best'].append(self.summary(measure='best'))
         self.summaries = summaries
 
     def plot_progress(self, fig=None, ax=None):
         """Plot the progress of the generations."""
+        nrows = len(self.summary())
         if fig is None and ax is None:
-            fig, ax = plt.subplots(ncols=1, nrows=len(self.summary()))
+            fig, ax = plt.subplots(ncols=1, nrows=nrows, sharex=True)
         else:
-            if not len(ax) == len(self.summary()):
+            if not len(ax) == nrows:
                 raise ValueError(
-                    f"ax has length {len(ax)} but summary has length {len(self.summary())}"
+                    f"ax has length {len(ax)} but summary has length {nrows}"
                 )
 
         fig.set_size_inches(8, 8)
         for i, summ in enumerate(self.summary()):
-            y = [gen[summ] for gen in self.summaries]
-            ax[i].plot(y)
-            ax[i].set_ylabel(summ)
+            y_mean = [gen[summ] for gen in self.summaries['mean']]
+            y_best = [gen[summ] for gen in self.summaries['best']]
+            
+            ax[i].plot(y_mean, label='mean')
+            ax[i].plot(y_best, label='best')
+            ax[i].set_ylabel(summ, rotation=0, ha='right', x=-1)
+            ax[i].grid()
+            if i == 0:
+                ax[i].legend()
+            if i == nrows-1:
+                ax[i].set_xticks(list(range(len(y_mean))))
+                ax[i].set_xticklabels(list(range(len(y_mean))))
