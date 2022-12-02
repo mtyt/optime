@@ -69,7 +69,8 @@ def child(parent_1, parent_2):
 
 class Population:
     """goals_dict is a dictionnary with as keys the column names that
-    need to be optimized and as values 'min' or 'max'.
+    need to be optimized and as values another dict with 'direction': 'min' or 'max'
+    and optionally 'target': a numerical value, which can be used as stop criterion.
     conditions is a list of strings that represent names of columns
     for which the value must be True, otherwise the individual is
     removed from the pareto-front immediately.
@@ -119,6 +120,11 @@ class Population:
     def goals_names(self):
         """Returns the keys of the goals_dict."""
         return list(self.goals_dict.keys())
+    
+    @property
+    def goals_directions(self):
+        """Returns the directions of the goals_dict."""
+        return [val["direction"] for _, val in self.goals_dict]
 
     @property
     def individuals(self):
@@ -166,13 +172,13 @@ class Population:
             if measure == 'mean':
                 summary_dict[goal] = np.mean(self.df[goal])
             elif measure == 'best':
-                target = self.goals_dict[goal]
-                if target == 'min':
+                direction = self.goals_dict[goal]['direction']
+                if direction == 'min':
                     summary_dict[goal] = np.min(self.df[goal])
-                elif target == 'max':
+                elif direction == 'max':
                     summary_dict[goal] = np.max(self.df[goal])
                 else:
-                    ValueError(f'goals should be min or max but got {target}.')
+                    ValueError(f'goals should be min or max but got {direction}.')
             else:
                 raise ValueError(f'measure should be mean or best but got {measure}.')
         for cond in self.conditions:
@@ -299,9 +305,9 @@ class Population:
         front = pd.DataFrame(columns=df.columns)
         worse_dict = {}  # dict containing a sorted df per criterium
         for col in crit_cols:
-            if crit_cols[col] == "min":
+            if crit_cols[col]["direction"] == "min":
                 worse_dict[col] = df.sort_values(col, ascending=True)
-            elif crit_cols[col] == "max":
+            elif crit_cols[col]["direction"] == "max":
                 worse_dict[col] = df.sort_values(col, ascending=False)
             else:
                 raise ValueError("Values in crit_cols must be 'min' or 'max'")
@@ -365,6 +371,25 @@ class Population:
 
         plt.show()
 
+    def targets_met(self):
+        """Returns whether or not any individual in the population has met all the
+         targets. But only if every goal has a target set.
+        """
+        if not all(["target" in val for _, val in self.goals_dict.items()]):
+            return False
+        for _, row in self.df.iterrows():
+            targets_met = []
+            for goal_name, val in self.goals_dict.items():
+                if val["direction"] == 'min':
+                    targets_met.append(row[goal_name] <= val["target"])
+                elif val["direction"] == 'max':
+                    targets_met.append(row[goal_name] >= val["target"])
+                else:
+                    ValueError(f"Not min or max but {val['direction']}")
+            if all(targets_met):
+                return True
+        return False
+
     def run(
         self,
         n_gen: int = 10,
@@ -413,10 +438,18 @@ class Population:
                     best_stops.append(best_stop)
                 stop_mean = all(mean_stops)
                 stop_best = all(best_stops)
-            
-            stop = stop_mean and stop_best
+                
+            # if all targets are met, stop.
+            # for each individual, check if all targets are met.
+            stop_targets = self.targets_met()
+            stop = (stop_mean and stop_best) or stop_targets
             if stop:
                 print("Stop criteria met, stopping early.")
+                if stop_mean and stop_best:
+                    print("Mean and best values for goals haven't changed for "
+                          f"{stop_on_steady_n} generations")
+                if stop_targets:
+                    print("At least one individual in the population has met all targets.")
                 break
         self.summaries = summaries
 
@@ -432,13 +465,18 @@ class Population:
                 )
 
         fig.set_size_inches(8, 8)
-        for i, summ in enumerate(self.summary()):
-            y_mean = [gen[summ] for gen in self.summaries['mean']]
-            y_best = [gen[summ] for gen in self.summaries['best']]
-            
-            ax[i].plot(y_mean, label='mean')
-            ax[i].plot(y_best, label='best')
-            ax[i].set_ylabel(summ, rotation=0, ha='right', x=-1)
+        for i, goal_name in enumerate(self.summary()):
+            y_mean = [gen[goal_name] for gen in self.summaries['mean']]
+            y_best = [gen[goal_name] for gen in self.summaries['best']]
+            y_targ = None
+            if goal_name in self.goals_dict:
+                if "target" in self.goals_dict[goal_name]:
+                    y_targ = [self.goals_dict[goal_name]["target"] for _ in y_mean]
+            ax[i].plot(y_mean, 'r--x', label='mean')
+            ax[i].plot(y_best, 'r-o', label='best')
+            if y_targ:
+                ax[i].plot(y_targ, 'b-', label='target')
+            ax[i].set_ylabel(goal_name, rotation=0, ha='right', x=-1)
             ax[i].grid()
             if i == 0:
                 ax[i].legend()
