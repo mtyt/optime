@@ -138,10 +138,15 @@ class TestPopulation(unittest.TestCase):
         pop.individuals = inds
         check = pop.targets_met()
         self.assertFalse(check)
-        
+        pop.run(10, stop_on_steady_n=3)
+        self.assertTrue(len(pop.summaries['mean']) > 1)
+
         for _ in range(5):
             inds.append(Individual("Belgium", "Dutch", some_property=[2022, 0, 0]))
 
         pop.individuals = inds
         check = pop.targets_met()
         self.assertTrue(check)
+        
+        pop.run(10)
+        self.assertEqual(len(pop.summaries['mean']), 1)  # should finish in 1 gen since targets met.
