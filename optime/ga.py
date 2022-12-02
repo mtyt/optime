@@ -371,6 +371,7 @@ class Population:
         mateprob: float = 1.0,
         mutprob: float = 0.01,
         mutvalues: Optional[list | list[list]] = None,
+        stop_on_steady_n: Optional[int] = None,
         verbose: bool = False,
     ) -> None:
         """Run the optimization for n_gen generations.
@@ -381,10 +382,14 @@ class Population:
                 length equal to population size.
             mutprob: Probability of mutating, should be <=1.
             mutvalues: If necessary, can pass possible values for each element in the DNA
+            stop_on_steady_n: if the mean and best values for all criteria don't change
+                for this many generations, exit.
             verbose: Turn on or off print statements.
 
         """
-        summaries = {'mean':[], 'best':[]}
+        if stop_on_steady_n is None:
+            stop_on_steady_n = n_gen
+        summaries: dict = {'mean': [], 'best': []}
         for gen in np.arange(n_gen):
             if verbose:
                 print(f"Doing generation {gen}.")
@@ -393,6 +398,26 @@ class Population:
             self.mutate(mutprob, mutvalues)
             summaries['mean'].append(self.summary(measure='mean'))
             summaries['best'].append(self.summary(measure='best'))
+            stop_mean = False
+            stop_best = False
+            # if both the mean and best values haven't changed for 3 generations, stop.
+            if gen > stop_on_steady_n-1:
+                mean_stops = []
+                best_stops = []
+                for goal in self.goals_dict:
+                    y_mean = [summ[goal] for summ in summaries['mean'][-stop_on_steady_n::]]
+                    mean_stop = np.array(y_mean).std() < 1e-9
+                    mean_stops.append(mean_stop)
+                    y_best = [summ[goal] for summ in summaries['best'][-stop_on_steady_n::]]
+                    best_stop = np.array(y_best).std() < 1e-9
+                    best_stops.append(best_stop)
+                stop_mean = all(mean_stops)
+                stop_best = all(best_stops)
+            
+            stop = stop_mean and stop_best
+            if stop:
+                print("Stop criteria met, stopping early.")
+                break
         self.summaries = summaries
 
     def plot_progress(self, fig=None, ax=None):
