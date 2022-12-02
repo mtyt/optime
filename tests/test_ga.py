@@ -74,7 +74,7 @@ class TestPopulation(unittest.TestCase):
 
     Individual.dna = property(fget=get_dna, fset=set_dna)
 
-    goals = {"some_performance": "min"}
+    goals = {"some_performance": {"direction": "min", "target": 0}}
     conditions = ["some_condition"]
 
     pop = Population(inds, goals, conditions)
@@ -128,3 +128,20 @@ class TestPopulation(unittest.TestCase):
             2, ind_class=Individual
         )  # should create pop with 2 individuals
         self.assertEqual(len(pop_1.individuals), 2)
+        
+    def test_targets_met(self):
+        pop = TestPopulation.pop
+        inds = []
+        for _ in range(5):
+            inds.append(Individual("Belgium", "Dutch", some_property=[2023, 0, 0]))
+
+        pop.individuals = inds
+        check = pop.targets_met()
+        self.assertFalse(check)
+        
+        for _ in range(5):
+            inds.append(Individual("Belgium", "Dutch", some_property=[2022, 0, 0]))
+
+        pop.individuals = inds
+        check = pop.targets_met()
+        self.assertTrue(check)
