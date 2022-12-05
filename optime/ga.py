@@ -112,7 +112,7 @@ class Population:
     def goals_names(self):
         """Returns the keys of the goals_dict."""
         return list(self.goals_dict.keys())
-    
+
     @property
     def goals_directions(self):
         """Returns the directions of the goals_dict."""
@@ -147,32 +147,32 @@ class Population:
             ]
         return df_pop
 
-    def summary(self, measure: str = 'mean') -> dict:
+    def summary(self, measure: str = "mean") -> dict:
         """Returns a dict which is a summary of the performance of the
         Population as a mean of each parameter.
-        
+
         Args:
             measure: 'mean' or 'best'
-            
+
         Returns:
             dict with the mean or best for each parameter, plus which percentage of
             conditions are met.
         """
-        
+
         summary_dict = dict()
         for goal in self.goals_dict:
-            if measure == 'mean':
+            if measure == "mean":
                 summary_dict[goal] = np.mean(self.df[goal])
-            elif measure == 'best':
-                direction = self.goals_dict[goal]['direction']
-                if direction == 'min':
+            elif measure == "best":
+                direction = self.goals_dict[goal]["direction"]
+                if direction == "min":
                     summary_dict[goal] = np.min(self.df[goal])
-                elif direction == 'max':
+                elif direction == "max":
                     summary_dict[goal] = np.max(self.df[goal])
                 else:
-                    ValueError(f'goals should be min or max but got {direction}.')
+                    ValueError(f"goals should be min or max but got {direction}.")
             else:
-                raise ValueError(f'measure should be mean or best but got {measure}.')
+                raise ValueError(f"measure should be mean or best but got {measure}.")
         for cond in self.conditions:
             summary_dict[cond] = sum(self.df[cond]) / len(self.df)
         return summary_dict
@@ -281,10 +281,6 @@ class Population:
         1 criterium and the point is non-dominated.
 
         TODO: allow list for crit_cols, assuming all are 'min'
-        TODO: rethink definition of Pareto, or allow 2. Because now I can have
-        individuals with the same score on 1 criterium (0) but that are clearly
-        better than others because of another criterium, but they're all part
-        of the front.
         """
         if df is None:
             df = self.df
@@ -320,7 +316,7 @@ class Population:
             nondom = df_temp.index.equals(pd.Index(union))
             if nondom:
                 front = pd.concat([front, df.loc[[item], :]], axis=0)
-                
+
             # remove duplicates from front
             front = front.drop_duplicates(subset=list(self.goals_dict.keys()))
         return front
@@ -370,16 +366,16 @@ class Population:
 
     def targets_met(self):
         """Returns whether or not any individual in the population has met all the
-         targets. But only if every goal has a target set.
+        targets. But only if every goal has a target set.
         """
         if not all(["target" in val for _, val in self.goals_dict.items()]):
             return False
         for _, row in self.df.iterrows():
             targets_met = []
             for goal_name, val in self.goals_dict.items():
-                if val["direction"] == 'min':
+                if val["direction"] == "min":
                     targets_met.append(row[goal_name] <= val["target"])
-                elif val["direction"] == 'max':
+                elif val["direction"] == "max":
                     targets_met.append(row[goal_name] >= val["target"])
                 else:
                     ValueError(f"Not min or max but {val['direction']}")
@@ -411,31 +407,35 @@ class Population:
         """
         if stop_on_steady_n is None:
             stop_on_steady_n = n_gen
-        summaries: dict = {'mean': [], 'best': []}
+        summaries: dict = {"mean": [], "best": []}
         for gen in np.arange(n_gen):
             if verbose:
                 print(f"Doing generation {gen}.")
             self.make_offspring(mateprob)
             self.trim()
             self.mutate(mutprob, mutvalues)
-            summaries['mean'].append(self.summary(measure='mean'))
-            summaries['best'].append(self.summary(measure='best'))
+            summaries["mean"].append(self.summary(measure="mean"))
+            summaries["best"].append(self.summary(measure="best"))
             stop_mean = False
             stop_best = False
             # if both the mean and best values haven't changed for 3 generations, stop.
-            if gen > stop_on_steady_n-1:
+            if gen > stop_on_steady_n - 1:
                 mean_stops = []
                 best_stops = []
                 for goal in self.goals_dict:
-                    y_mean = [summ[goal] for summ in summaries['mean'][-stop_on_steady_n::]]
+                    y_mean = [
+                        summ[goal] for summ in summaries["mean"][-stop_on_steady_n::]
+                    ]
                     mean_stop = np.array(y_mean).std() < 1e-9
                     mean_stops.append(mean_stop)
-                    y_best = [summ[goal] for summ in summaries['best'][-stop_on_steady_n::]]
+                    y_best = [
+                        summ[goal] for summ in summaries["best"][-stop_on_steady_n::]
+                    ]
                     best_stop = np.array(y_best).std() < 1e-9
                     best_stops.append(best_stop)
                 stop_mean = all(mean_stops)
                 stop_best = all(best_stops)
-                
+
             # if all targets are met, stop.
             # for each individual, check if all targets are met.
             stop_targets = self.targets_met()
@@ -443,10 +443,14 @@ class Population:
             if stop:
                 print("Stop criteria met, stopping early.")
                 if stop_mean and stop_best:
-                    print("Mean and best values for goals haven't changed for "
-                          f"{stop_on_steady_n} generations")
+                    print(
+                        "Mean and best values for goals haven't changed for "
+                        f"{stop_on_steady_n} generations"
+                    )
                 if stop_targets:
-                    print("At least one individual in the population has met all targets.")
+                    print(
+                        "At least one individual in the population has met all targets."
+                    )
                 break
         self.summaries = summaries
 
@@ -463,20 +467,20 @@ class Population:
 
         fig.set_size_inches(8, 8)
         for i, goal_name in enumerate(self.summary()):
-            y_mean = [gen[goal_name] for gen in self.summaries['mean']]
-            y_best = [gen[goal_name] for gen in self.summaries['best']]
+            y_mean = [gen[goal_name] for gen in self.summaries["mean"]]
+            y_best = [gen[goal_name] for gen in self.summaries["best"]]
             y_targ = None
             if goal_name in self.goals_dict:
                 if "target" in self.goals_dict[goal_name]:
                     y_targ = [self.goals_dict[goal_name]["target"] for _ in y_mean]
-            ax[i].plot(y_mean, 'r--x', label='mean')
-            ax[i].plot(y_best, 'r-o', label='best')
+            ax[i].plot(y_mean, "r--x", label="mean")
+            ax[i].plot(y_best, "r-o", label="best")
             if y_targ:
-                ax[i].plot(y_targ, 'b-', label='target')
-            ax[i].set_ylabel(goal_name, rotation=0, ha='right', x=-1)
+                ax[i].plot(y_targ, "b-", label="target")
+            ax[i].set_ylabel(goal_name, rotation=0, ha="right", x=-1)
             ax[i].grid()
             if i == 0:
                 ax[i].legend()
-            if i == nrows-1:
+            if i == nrows - 1:
                 ax[i].set_xticks(list(range(len(y_mean))))
                 ax[i].set_xticklabels(list(range(len(y_mean))))
