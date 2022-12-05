@@ -10,14 +10,6 @@ import matplotlib.pyplot as plt
 rng = np.random.default_rng()
 
 
-def sort_pareto(df, crit_cols):
-    """Find the Pareto front and assign all the items the order 0,
-    then remove these items from the df and find the next PF, whih is
-    assigned order 1, etc...
-    NOT YET IMPLEMENTED
-    """
-
-
 def child(parent_1, parent_2):
     """Produce a child of two parents, based on DNA exchange"""
     if not isinstance(parent_1, type(parent_2)):
@@ -303,29 +295,34 @@ class Population:
 
         crit_cols = self.goals_dict
         front = pd.DataFrame(columns=df.columns)
-        worse_dict = {}  # dict containing a sorted df per criterium
-        for col in crit_cols:
-            if crit_cols[col]["direction"] == "min":
-                worse_dict[col] = df.sort_values(col, ascending=True)
-            elif crit_cols[col]["direction"] == "max":
-                worse_dict[col] = df.sort_values(col, ascending=False)
-            else:
-                raise ValueError("Values in crit_cols must be 'min' or 'max'")
 
         for item in df.index:
             union = np.array([])
+            # temporarily remove all individuals with the exact same performance as the
+            # current item:
+            cc = list(crit_cols.keys())
+            equal_index = df[(df[cc] == df.loc[item, cc]).all(axis=1)].index
+            df_temp = df.drop(index=equal_index)
             for col in crit_cols:
-                worse_index = worse_dict[col].loc[item::].index
-                # remove all rows that have the same value on col as item:
-                val = worse_dict[col].loc[item, col]
-                same_val = worse_dict[col][worse_dict[col][col] == val]
-                same_val_index = same_val.index
-                # worse actually means not strictly better
-                worse_index = np.union1d(worse_index, same_val_index)
+                # Add the individuals that have a (strictly) worse performance on 1
+                # criterium to the Union.
+                if crit_cols[col]["direction"] == "min":
+                    worse_index = df_temp[df_temp[col] > df.at[item, col]].index
+                elif crit_cols[col]["direction"] == "max":
+                    worse_index = df_temp[df_temp[col] < df.at[item, col]].index
+                else:
+                    raise ValueError("Values in crit_cols must be 'min' or 'max'")
                 union = np.union1d(union, worse_index)
-            nondom = df.index.equals(pd.Index(union))
+            # the current individual is non-dominated if the index of the df_temp (that
+            # is without the individuals with the exact same performance as the current
+            # item) equals the index of the union. That means that ALL OTHER individuals
+            # are worse on at least 1 criterium.
+            nondom = df_temp.index.equals(pd.Index(union))
             if nondom:
                 front = pd.concat([front, df.loc[[item], :]], axis=0)
+                
+            # remove duplicates from front
+            front = front.drop_duplicates(subset=list(self.goals_dict.keys()))
         return front
 
     def plot_pareto(self, mode="2d"):
