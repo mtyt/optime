@@ -2,6 +2,7 @@
 import unittest
 import numpy as np
 from optime.ga import child, Population
+from functools import partial
 
 rng = np.random.default_rng()
 
@@ -93,18 +94,27 @@ class TestPopulation(unittest.TestCase):
         pop.make_offspring()
         pop.trim(n=12)
         self.assertEqual(len(pop.df), 12)
-        pop.mutate(mutprob=1, values=[6])  # should turn all DNA values into 6
+        
+        def return_val(val):
+            return val
+        
+        pop.mutate(mutprob=1, mutfunc=partial(return_val, 6))  # should turn all DNA values into 6
         self.assertTrue(
             all([all([val == 6 for val in ind.dna]) for ind in pop.individuals])
         )
         # now also the DNA values should return list of 6:
         self.assertTrue(pop.possible_dna_values == [[6]] * TestPopulation.dna_length)
-        pop.mutate(mutprob=0, values=[8000])  # should turn NO DNA values into 8:
+        pop.mutate(mutprob=0, mutfunc=partial(return_val, 8000))  # should turn NO DNA values into 8:
         self.assertTrue(
             all([all([val != 8000 for val in ind.dna]) for ind in pop.individuals])
         )
+        
+        def return_a_or_b(a, b):
+            return rng.choice([a,b])
         pop.mutate(
-            mutprob=1, values=[[8000, 166], [8000], [8000]]
+            mutprob=1, mutfunc=[partial(return_a_or_b, 166, 8000),
+                                partial(return_val, 8000),
+                                partial(return_val, 166)]
         )  # should turn All DNA values into 8000 or 166:
         self.assertTrue(
             all(

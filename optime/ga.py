@@ -1,9 +1,9 @@
 """Optimization"""
-from functools import cached_property
+from functools import cached_property, partial
 from inspect import signature
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Callable
 import matplotlib.pyplot as plt
 
 
@@ -200,7 +200,7 @@ class Population:
         self.individuals = rec
 
     def mutate(
-        self, mutprob: float = 0.01, values: Optional[list | list[list]] = None
+        self, mutprob: float = 0.01, mutfunc: Optional[Callable | list[Callable]] = None
     ) -> None:
         """Mutate the DNA of the individuals of the population. Each gene has a
         probability 'prob' of mutating. If values is specified, it lists all possible
@@ -217,31 +217,39 @@ class Population:
         if mutprob < 0 or mutprob > 1:
             raise ValueError(f"mutprob should be min 0 and max 1 (received {mutprob}).")
 
-        if values is None:
-            values = [0, 1]
-        if isinstance(values, list):
-            if not all([isinstance(val, list) for val in values]):
-                # Either it's just a list of values:
-                if not all([isinstance(val, type(values[0])) for val in values]):
-                    raise ValueError(
-                        "values is not a list of list nor a list of the same type"
-                    )
-                else:
-                    flat_list = True
-            else:
-                flat_list = False
+        dna_len = len(self.individuals[0].dna)
+        
+        if mutfunc is None:
+            # create a RNG for every gene based on a uniform distribution between the
+            # min and max values currently in the population (note that this may cause
+            # unwanted convergence)
+            maxes = [max([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)]
+            mins = [min([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)]
+            
+            def random_min_max(a, b):
+                """Returns a uniform random number between a and b."""
+                return (b - a) * rng.random() + a
+            
+            # create a list of functions without arguments. The interval for the random
+            # function is fixed by using partial.
+            mutfunc = [partial(random_min_max, a, b) for a, b in zip(mins, maxes)]
+        
+        if isinstance(mutfunc, list):
+            if not all([hasattr(func, '__call__') for func in mutfunc]):
+                raise ValueError(
+                    "mutfunc must be a function or a list of functions"
+                )
+                
+        elif hasattr(mutfunc, '__call__'):
+            mutfunc = [mutfunc for _ in range(dna_len)]
+        else:
+            raise TypeError("mutfunc should be a function or a list of functions.")
 
         for ind in self.individuals:
             for index, original_val in enumerate(ind.dna):
-                if flat_list:
-                    gene_values = values.copy()
-                else:
-                    gene_values = values[index].copy()
-                if original_val in gene_values:
-                    gene_values.remove(original_val)
                 # now check the probability:
-                if (rng.random() <= mutprob) and gene_values:
-                    ind.dna[index] = rng.choice(gene_values)
+                if (rng.random() <= mutprob):
+                    ind.dna[index] = mutfunc[index]()
 
     def trim(self, n=None):
         """Trim the population down to n individuals, based on Pareto front"""
@@ -388,7 +396,7 @@ class Population:
         n_gen: int = 10,
         mateprob: float = 1.0,
         mutprob: float = 0.01,
-        mutvalues: Optional[list | list[list]] = None,
+        mutfunc: Optional[Callable | list[Callable]] = None,
         stop_on_steady_n: Optional[int] = None,
         verbose: bool = False,
     ) -> None:
@@ -399,7 +407,8 @@ class Population:
             mateprob: Probability for mating. 1 corresponds to 2 parent vectors of
                 length equal to population size.
             mutprob: Probability of mutating, should be <=1.
-            mutvalues: If necessary, can pass possible values for each element in the DNA
+            mutfunc: If necessary, can pass a function or list of functions to generate
+                mutation values.
             stop_on_steady_n: if the mean and best values for all criteria don't change
                 for this many generations, exit.
             verbose: Turn on or off print statements.
@@ -412,8 +421,8 @@ class Population:
             if verbose:
                 print(f"Doing generation {gen}.")
             self.make_offspring(mateprob)
+            self.mutate(mutprob, mutfunc=mutfunc)
             self.trim()
-            self.mutate(mutprob, mutvalues)
             summaries["mean"].append(self.summary(measure="mean"))
             summaries["best"].append(self.summary(measure="best"))
             stop_mean = False
@@ -473,8 +482,8 @@ class Population:
             if goal_name in self.goals_dict:
                 if "target" in self.goals_dict[goal_name]:
                     y_targ = [self.goals_dict[goal_name]["target"] for _ in y_mean]
-            ax[i].plot(y_mean, "r--x", label="mean")
-            ax[i].plot(y_best, "r-o", label="best")
+            ax[i].plot(y_mean, "r--", label="mean")
+            ax[i].plot(y_best, "r-", label="best")
             if y_targ:
                 ax[i].plot(y_targ, "b-", label="target")
             ax[i].set_ylabel(goal_name, rotation=0, ha="right", x=-1)

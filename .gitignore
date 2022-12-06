@@ -139,3 +139,6 @@ dmypy.json
 
 # VScode stuff
 .vscode/
+
+# debug folder
+debug/
