@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Callable
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 
 rng = np.random.default_rng()
@@ -218,29 +219,31 @@ class Population:
             raise ValueError(f"mutprob should be min 0 and max 1 (received {mutprob}).")
 
         dna_len = len(self.individuals[0].dna)
-        
+
         if mutfunc is None:
             # create a RNG for every gene based on a uniform distribution between the
             # min and max values currently in the population (note that this may cause
             # unwanted convergence)
-            maxes = [max([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)]
-            mins = [min([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)]
-            
+            maxes = [
+                max([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)
+            ]
+            mins = [
+                min([ind.dna[i] for ind in self.individuals]) for i in range(dna_len)
+            ]
+
             def random_min_max(a, b):
                 """Returns a uniform random number between a and b."""
                 return (b - a) * rng.random() + a
-            
+
             # create a list of functions without arguments. The interval for the random
             # function is fixed by using partial.
             mutfunc = [partial(random_min_max, a, b) for a, b in zip(mins, maxes)]
-        
+
         if isinstance(mutfunc, list):
-            if not all([hasattr(func, '__call__') for func in mutfunc]):
-                raise ValueError(
-                    "mutfunc must be a function or a list of functions"
-                )
-                
-        elif hasattr(mutfunc, '__call__'):
+            if not all([hasattr(func, "__call__") for func in mutfunc]):
+                raise ValueError("mutfunc must be a function or a list of functions")
+
+        elif hasattr(mutfunc, "__call__"):
             mutfunc = [mutfunc for _ in range(dna_len)]
         else:
             raise TypeError("mutfunc should be a function or a list of functions.")
@@ -248,7 +251,7 @@ class Population:
         for ind in self.individuals:
             for index, original_val in enumerate(ind.dna):
                 # now check the probability:
-                if (rng.random() <= mutprob):
+                if rng.random() <= mutprob:
                     ind.dna[index] = mutfunc[index]()
 
     def trim(self, n=None):
@@ -395,7 +398,7 @@ class Population:
         self,
         n_gen: int = 10,
         mateprob: float = 1.0,
-        mutprob: float = 0.01,
+        mutprob: float = 0.0,
         mutfunc: Optional[Callable | list[Callable]] = None,
         stop_on_steady_n: Optional[int] = None,
         verbose: bool = False,
@@ -491,5 +494,5 @@ class Population:
             if i == 0:
                 ax[i].legend()
             if i == nrows - 1:
-                ax[i].set_xticks(list(range(len(y_mean))))
-                ax[i].set_xticklabels(list(range(len(y_mean))))
+                ax[i].xaxis.set_major_locator(MaxNLocator(integer=True))
+                ax[i].set_xlabel("Generation")
