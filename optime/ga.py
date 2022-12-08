@@ -3,7 +3,7 @@ from functools import cached_property, partial
 from inspect import signature
 import pandas as pd
 import numpy as np
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
@@ -201,7 +201,7 @@ class Population:
         self.individuals = rec
 
     def mutate(
-        self, mutprob: float = 0.01, mutfunc: Optional[Callable | list[Callable]] = None
+        self, mutprob: float = 0.01, mutfunc: Optional[Callable | List[Callable]] = None
     ) -> None:
         """Mutate the DNA of the individuals of the population. Each gene has a
         probability 'prob' of mutating. If values is specified, it lists all possible
