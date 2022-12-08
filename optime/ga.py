@@ -399,7 +399,7 @@ class Population:
         n_gen: int = 10,
         mateprob: float = 1.0,
         mutprob: float = 0.0,
-        mutfunc: Optional[Union[Callable, list[Callable]]] = None,
+        mutfunc: Optional[Union[Callable, List[Callable]]] = None,
         stop_on_steady_n: Optional[int] = None,
         verbose: bool = False,
     ) -> None:
