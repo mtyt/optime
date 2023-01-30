@@ -94,27 +94,35 @@ class TestPopulation(unittest.TestCase):
         pop.make_offspring()
         pop.trim(n=12)
         self.assertEqual(len(pop.df), 12)
-        
+
         def return_val(val):
             return val
-        
-        pop.mutate(mutprob=1, mutfunc=partial(return_val, 6))  # should turn all DNA values into 6
+
+        pop.mutate(
+            mutprob=1, mutfunc=partial(return_val, 6)
+        )  # should turn all DNA values into 6
         self.assertTrue(
             all([all([val == 6 for val in ind.dna]) for ind in pop.individuals])
         )
         # now also the DNA values should return list of 6:
         self.assertTrue(pop.possible_dna_values == [[6]] * TestPopulation.dna_length)
-        pop.mutate(mutprob=0, mutfunc=partial(return_val, 8000))  # should turn NO DNA values into 8:
+        pop.mutate(
+            mutprob=0, mutfunc=partial(return_val, 8000)
+        )  # should turn NO DNA values into 8:
         self.assertTrue(
             all([all([val != 8000 for val in ind.dna]) for ind in pop.individuals])
         )
-        
+
         def return_a_or_b(a, b):
-            return rng.choice([a,b])
+            return rng.choice([a, b])
+
         pop.mutate(
-            mutprob=1, mutfunc=[partial(return_a_or_b, 166, 8000),
-                                partial(return_val, 8000),
-                                partial(return_val, 166)]
+            mutprob=1,
+            mutfunc=[
+                partial(return_a_or_b, 166, 8000),
+                partial(return_val, 8000),
+                partial(return_val, 166),
+            ],
         )  # should turn All DNA values into 8000 or 166:
         self.assertTrue(
             all(
@@ -127,18 +135,14 @@ class TestPopulation(unittest.TestCase):
 
     def test_init(self):
         def cause_err():
-            pop_err = Population()  # should raise ValueError
+            _ = Population(1, {})  # should raise ValueError
 
         self.assertRaises(ValueError, cause_err)
         pop_0 = Population(
-            ind_class=Individual
-        )  # should create pop with 10 individuals
-        self.assertEqual(len(pop_0.individuals), 10)
-        pop_1 = Population(
-            2, ind_class=Individual
+            2, {}, ind_class=Individual
         )  # should create pop with 2 individuals
-        self.assertEqual(len(pop_1.individuals), 2)
-        
+        self.assertEqual(len(pop_0.individuals), 2)
+
     def test_targets_met(self):
         pop = TestPopulation.pop
         inds = []
@@ -149,7 +153,7 @@ class TestPopulation(unittest.TestCase):
         check = pop.targets_met()
         self.assertFalse(check)
         pop.run(10, stop_on_steady_n=3)
-        self.assertTrue(len(pop.summaries['mean']) > 1)
+        self.assertTrue(len(pop.summaries["mean"]) > 1)
 
         for _ in range(5):
             inds.append(Individual("Belgium", "Dutch", some_property=[2022, 0, 0]))
@@ -157,6 +161,8 @@ class TestPopulation(unittest.TestCase):
         pop.individuals = inds
         check = pop.targets_met()
         self.assertTrue(check)
-        
+
         pop.run(10)
-        self.assertEqual(len(pop.summaries['mean']), 1)  # should finish in 1 gen since targets met.
+        self.assertEqual(
+            len(pop.summaries["mean"]), 1
+        )  # should finish in 1 gen since targets met.

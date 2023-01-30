@@ -3,16 +3,66 @@ from functools import cached_property, partial
 from inspect import signature
 import pandas as pd
 import numpy as np
-from typing import Optional, Callable, List, Union
+from typing import (
+    Optional,
+    Callable,
+    List,
+    Union,
+    TypeVar,
+    Type,
+    Any,
+    Dict,
+    TypedDict,
+    NotRequired,
+)
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 
 rng = np.random.default_rng()
 
+# Typing:
 
-def child(parent_1, parent_2):
-    """Produce a child of two parents, based on DNA exchange"""
+Numeric = Union[int, float, np.number]
+
+
+class GoalDict(TypedDict):
+    direction: str
+    target: NotRequired[Numeric]
+
+
+T = TypeVar(
+    "T", bound=Any
+)  # Anything, but both arguments must be same and function returns the same
+
+# End typing
+
+
+def child(parent_1: T, parent_2: T) -> T:
+    """Produce a child of two parents, based on DNA exchange.
+    Each parent must have an attribute called 'dna'. Usually this would just be a
+    reference to another attribute, and it should be an array (or list). This function
+    will then construct a new instance of the same class with a new dna vector, based on
+    a random combination of the parents' dna. But in order to do that, it has to keep
+    the attributes that are not the dna the same as the parents. But this can get tricky
+    if the parents have different values for some attributes.
+    I attempted to solve this by allowing the use of an additional attribute called
+    'parent_props' on the parents. If it exists, it should be a list of strings, which
+    represents the attribute names of the parents. This function will then obtain these
+    attributes from parent_1 and use them in the __init__ of the child.
+    If `parent_props` does not exist, the function will look at the signature of the
+    __init__ method and check all of the arguments in the parents, but raise an exception
+    if any of the values of the attributes are different in the parents.
+    If for example the parents have different `name` attributes, this will result in an
+    error.
+
+    Args:
+        parent_1: An instance of a class, should have a 'dna' attribute
+        parent_2: An instance of a class, should have a 'dna' attribute
+
+    Returns:
+        A new instance of the same class, with mixed dna.
+    """
     if not isinstance(parent_1, type(parent_2)):
         raise TypeError("To inputs must be the same class!")
     child_cls = parent_1.__class__
@@ -71,21 +121,37 @@ class Population:
 
     def __init__(
         self,
-        individuals=None,
-        goals_dict=None,
-        conditions=None,
-        ind_class=None,
-        possible_dna_values=None,
-    ):
-        if individuals is None:
-            individuals = 10
+        individuals: Union[int, List[Any]],
+        goals_dict: Dict[str, GoalDict],
+        conditions: Optional[List[str]] = None,
+        ind_class: Optional[Type[object]] = None,
+        possible_dna_values: Optional[List[List]] = None,
+    ) -> None:
+        """Population is a set of individuals that can be optimized using a Genetic
+        Algorithm.
+
+        Args:
+            individuals: either a list of instances of a class, or an int.
+                In case of int, this many individuals of the ind_class class will be created.
+            goals_dict: of the format {"some_performance": {"direction": "min", "target": 0}}
+                The optimization goals, which must exist as attributes of the individuals.
+                direction can be min/max. target is optional and
+                if present, is used for stop criterium and plotting.
+            conditions: names of the attributes in the individuals that must be true,
+                otherwise individual will be removed from population
+            ind_class: if individuals is an int, this class will be used to make
+                a number of individuals.
+            possible_dna_values: if specified, this lists all possible values for each
+                gene in the dna
+        """
+
         if isinstance(individuals, int):
             if ind_class is None:
                 raise ValueError(
-                    "ind_class must be specified if individuals" "is None or an int."
+                    "ind_class must be specified if individuals" "is an int."
                 )
             individuals = [ind_class() for i in np.arange(individuals)]
-        self._individuals = individuals  # a list of Recipe objects
+        self._individuals = individuals
         self.original_size = len(individuals)
         self.goals_dict = goals_dict
         if conditions is None:
@@ -98,8 +164,13 @@ class Population:
         else:
             self.possible_dna_fixed = False
 
+    @property
+    def ind_class(self) -> Type:
+        """Returns the class of the individuals."""
+        return type(self.indviduals[0])
+
     @cached_property
-    def possible_dna_values(self):
+    def possible_dna_values(self) -> List[List]:
         """If the possibel DNA values have not been specified at init, derive them
         from all the values in the population."""
         if not self.possible_dna_fixed:
@@ -108,19 +179,21 @@ class Population:
             for i in range(dna_length):
                 dna_vals.append(list(set([ind.dna[i] for ind in self.individuals])))
             return dna_vals
+        else:
+            return self.possible_dna_values
 
     @property
-    def goals_names(self):
+    def goals_names(self) -> List[str]:
         """Returns the keys of the goals_dict."""
         return list(self.goals_dict.keys())
 
     @property
-    def goals_directions(self):
+    def goals_directions(self) -> List:
         """Returns the directions of the goals_dict."""
-        return [val["direction"] for _, val in self.goals_dict]
+        return [val["direction"] for _, val in self.goals_dict.items()]
 
     @property
-    def individuals(self):
+    def individuals(self) -> List:
         """Returns the _individuals."""
         return self._individuals
 
@@ -133,9 +206,9 @@ class Population:
                 delattr(self, prop)
 
     @cached_property
-    def df(self):
-        """A DataFrame with each row representing a Recipe, with
-        columns of kg of each food, the impact and enough_score.
+    def df(self) -> pd.DataFrame:
+        """A DataFrame with each row representing an individual, with
+        columns all the goals and conditions.
         """
         df_pop = pd.DataFrame(columns=["Individual"] + self.goals_names)
         for i, ind in enumerate(self.individuals):
@@ -201,7 +274,9 @@ class Population:
         self.individuals = rec
 
     def mutate(
-        self, mutprob: float = 0.01, mutfunc: Optional[Union[Callable, List[Callable]]] = None
+        self,
+        mutprob: float = 0.01,
+        mutfunc: Optional[Union[Callable, List[Callable]]] = None,
     ) -> None:
         """Mutate the DNA of the individuals of the population. Each gene has a
         probability 'prob' of mutating. If values is specified, it lists all possible
@@ -254,8 +329,12 @@ class Population:
                 if rng.random() <= mutprob:
                     ind.dna[index] = mutfunc[index]()
 
-    def trim(self, n=None):
-        """Trim the population down to n individuals, based on Pareto front"""
+    def trim(self, n: Optional[int] = None) -> None:
+        """Trim the population down to n individuals, based on Pareto front.
+
+        Args:
+            n: resulting number of individuals after trimming
+        """
         if n is None:
             n = self.original_size
         new_n = 0
@@ -273,7 +352,7 @@ class Population:
         self.individuals = list(new_pop.iloc[0:n]["Individual"].values)
         # print('Indices on df have been reset')
 
-    def pareto(self, df=None):
+    def pareto(self, df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """df is the dataframe on which to select the pareto front.
         crit_cols is a dict with the keys being the column names of df
         according which to sort, and the values being 'min' or 'max',
@@ -292,6 +371,13 @@ class Population:
         1 criterium and the point is non-dominated.
 
         TODO: allow list for crit_cols, assuming all are 'min'
+
+        Args:
+            df: if not defined, takes self.df. The DataFrame for which to obtain the
+                Pareto Front.
+
+        Returns:
+            The Pareto Front of the population.
         """
         if df is None:
             df = self.df
